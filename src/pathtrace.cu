@@ -6,6 +6,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
 #include <thrust/remove.h>
+#include <thrust/device_ptr.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -41,6 +42,13 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line)
     exit(EXIT_FAILURE);
 #endif // ERRORCHECK
 }
+
+// Predicate used for stream compaction to remove terminated paths.
+struct IsTerminated {
+    __host__ __device__ bool operator()(const PathSegment& p) const {
+        return p.remainingBounces <= 0;
+    }
+};
 
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth)
@@ -146,10 +154,17 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         segment.ray.origin = cam.position;
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        // TODO: implement antialiasing by jittering the ray
+        // AA jitter within the pixel
+        thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float jitterX = u01(rng) - 0.5f;
+        float jitterY = u01(rng) - 0.5f;
+
+        float sx = (float)x + jitterX;
+        float sy = (float)y + jitterY;
         segment.ray.direction = glm::normalize(cam.view
-            - cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-            - cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+            - cam.right * cam.pixelLength.x * (sx - (float)cam.resolution.x * 0.5f)
+            - cam.up    * cam.pixelLength.y * (sy - (float)cam.resolution.y * 0.5f)
         );
 
         segment.pixelIndex = index;
@@ -280,6 +295,50 @@ __global__ void shadeFakeMaterial(
     }
 }
 
+__global__ void shadeBSDF(
+    int iter,
+    int depth,
+    int num_paths,
+    ShadeableIntersection* shadeableIntersections,
+    PathSegment* pathSegments,
+    Material* materials,
+    glm::vec3* image)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_paths) return;
+
+    ShadeableIntersection isect = shadeableIntersections[idx];
+    PathSegment& path = pathSegments[idx];
+
+    if (isect.t > 0.0f)
+    {
+        Material m = materials[isect.materialId];
+
+        if (m.emittance > 0.0f)
+        {
+            path.color *= (m.color * m.emittance);
+            image[path.pixelIndex] += path.color;
+            path.color = glm::vec3(0.0f);
+            path.remainingBounces = 0;
+            return;
+        }
+
+        thrust::default_random_engine rng = makeSeededRandomEngine(iter, path.pixelIndex, depth);
+        glm::vec3 hitPoint = getPointOnRay(path.ray, isect.t);
+        scatterRay(path, hitPoint, isect.surfaceNormal, m, rng);
+
+        if (path.remainingBounces <= 0)
+        {
+            image[path.pixelIndex] += glm::vec3(0.0f);
+        }
+    }
+    else
+    {
+        path.color = glm::vec3(0.0f);
+        path.remainingBounces = 0;
+    }
+}
+
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
 {
@@ -372,29 +431,33 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         cudaDeviceSynchronize();
         depth++;
 
-        // TODO:
-        // --- Shading Stage ---
-        // Shade path segments based on intersections and generate new rays by
-        // evaluating the BSDF.
-        // Start off with just a big kernel that handles all the different
-        // materials you have in the scenefile.
-        // TODO: compare between directly shading the path segments and shading
-        // path segments that have been reshuffled to be contiguous in memory.
-
-        shadeFakeMaterial<<<numblocksPathSegmentTracing, blockSize1d>>>(
+        shadeBSDF<<<numblocksPathSegmentTracing, blockSize1d>>>(
             iter,
+            depth,
             num_paths,
             dev_intersections,
             dev_paths,
-            dev_materials
+            dev_materials,
+            dev_image
         );
-        iterationComplete = true; // TODO: should be based off stream compaction results.
+        checkCUDAError("shade BSDF");
+
+        thrust::device_ptr<PathSegment> paths_begin(dev_paths);
+        thrust::device_ptr<PathSegment> new_end = thrust::remove_if(
+            thrust::device, paths_begin, paths_begin + num_paths, IsTerminated());
+        num_paths = static_cast<int>(new_end - paths_begin);
+
+        iterationComplete = (num_paths == 0) || (depth >= traceDepth);
 
         if (guiData != NULL)
         {
             guiData->TracedDepth = depth;
         }
     }
+
+    // We accumulated contributions directly in shadeBSDF when paths hit lights.
+    // Skip final per-path accumulation by zeroing the active count.
+    num_paths = 0;
 
     // Assemble this iteration and apply it to the image
     dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
