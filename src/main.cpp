@@ -342,6 +342,7 @@ int main(int argc, char** argv)
 {
     startTimeString = currentTimeString();
 
+    // printf("location: %s ", argv[0]);
     if (argc < 2)
     {
         printf("Usage: %s SCENEFILE.json\n", argv[0]);
