@@ -1,5 +1,4 @@
 #include "intersections.h"
-#include <cfloat>
 
 __host__ __device__ float boxIntersectionTest(
     Geom box,
@@ -111,36 +110,4 @@ __host__ __device__ float sphereIntersectionTest(
     }
 
     return glm::length(r.origin - intersectionPoint);
-}
-
-__host__ __device__ float triangleIntersectionTest(
-    const Triangle& tri,
-    Ray r,
-    glm::vec3& intersectionPoint,
-    glm::vec3& normal,
-    bool& outside)
-{
-    const glm::vec3 v0 = tri.v0;
-    const glm::vec3 v1 = tri.v1;
-    const glm::vec3 v2 = tri.v2;
-    const glm::vec3 e1 = v1 - v0;
-    const glm::vec3 e2 = v2 - v0;
-    const glm::vec3 pvec = glm::cross(r.direction, e2);
-    const float det = glm::dot(e1, pvec);
-    if (fabsf(det) < 1e-7f) return -1.0f;
-    const float invDet = 1.0f / det;
-    const glm::vec3 tvec = r.origin - v0;
-    const float u = glm::dot(tvec, pvec) * invDet;
-    if (u < 0.0f || u > 1.0f) return -1.0f;
-    const glm::vec3 qvec = glm::cross(tvec, e1);
-    const float v = glm::dot(r.direction, qvec) * invDet;
-    if (v < 0.0f || u + v > 1.0f) return -1.0f;
-    const float t = glm::dot(e2, qvec) * invDet;
-    if (t <= 0.0f) return -1.0f;
-
-    intersectionPoint = r.origin + t * glm::normalize(r.direction);
-    glm::vec3 n = glm::normalize(glm::cross(e1, e2));
-    outside = glm::dot(n, r.direction) < 0.0f;
-    normal = outside ? n : -n;
-    return glm::length(intersectionPoint - r.origin);
 }

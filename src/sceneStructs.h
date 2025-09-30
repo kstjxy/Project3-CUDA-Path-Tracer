@@ -12,8 +12,7 @@
 enum GeomType
 {
     SPHERE,
-    CUBE,
-    MESH
+    CUBE
 };
 
 struct Ray
@@ -32,19 +31,6 @@ struct Geom
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
-    // Mesh-only fields
-    int triStart = -1;
-    int triCount = 0;
-    glm::vec3 bboxMin = glm::vec3(0.0f);
-    glm::vec3 bboxMax = glm::vec3(0.0f);
-};
-
-struct Triangle
-{
-    glm::vec3 v0;
-    glm::vec3 v1;
-    glm::vec3 v2;
-    int materialId;
 };
 
 struct Material
