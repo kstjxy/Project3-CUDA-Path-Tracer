@@ -7,6 +7,10 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 #include <thrust/device_ptr.h>
+#include <thrust/sort.h>
+#include <thrust/tuple.h>
+#include <thrust/iterator/zip_iterator.h>
+#include <climits>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -88,6 +92,7 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
+static int* dev_materialKeys = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 
@@ -117,7 +122,8 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
     cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
-    // TODO: initialize any extra device memeory you need
+    // material sort keys
+    cudaMalloc(&dev_materialKeys, pixelcount * sizeof(int));
 
     checkCUDAError("pathtraceInit");
 }
@@ -129,7 +135,7 @@ void pathtraceFree()
     cudaFree(dev_geoms);
     cudaFree(dev_materials);
     cudaFree(dev_intersections);
-    // TODO: clean up any extra device memory you created
+    cudaFree(dev_materialKeys);
 
     checkCUDAError("pathtraceFree");
 }
@@ -351,6 +357,15 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
     }
 }
 
+// Add per-path material keys for sorting
+__global__ void buildMaterialKeys(int n, const ShadeableIntersection* isects, int* keys)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    ShadeableIntersection s = isects[i];
+    keys[i] = (s.t > 0.0f) ? s.materialId : INT_MAX;
+}
+
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
@@ -430,6 +445,24 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();
         depth++;
+
+        //sort active paths by material to improve coherence
+        bool sortByMaterial = (guiData != NULL && guiData->SortByMaterial);
+        if (sortByMaterial && num_paths > 0)
+        {
+            dim3 kblock(blockSize1d);
+            dim3 kgrid((num_paths + kblock.x - 1) / kblock.x);
+            buildMaterialKeys<<<kgrid, kblock>>>(num_paths, dev_intersections, dev_materialKeys);
+            checkCUDAError("buildMaterialKeys");
+
+            thrust::device_ptr<int> keys_begin(dev_materialKeys);
+            thrust::device_ptr<ShadeableIntersection> is_begin(dev_intersections);
+            thrust::device_ptr<PathSegment> ps_begin(dev_paths);
+            auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(is_begin, ps_begin));
+            auto zip_end   = zip_begin + num_paths;
+            thrust::sort_by_key(thrust::device, keys_begin, keys_begin + num_paths, zip_begin);
+            checkCUDAError("sort_by_key material");
+        }
 
         shadeBSDF<<<numblocksPathSegmentTracing, blockSize1d>>>(
             iter,
