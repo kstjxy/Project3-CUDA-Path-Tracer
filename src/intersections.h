@@ -38,6 +38,40 @@ __host__ __device__ inline glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v)
     return glm::vec3(m * v);
 }
 
+// Axis-aligned bounding box intersection test (world space)
+__host__ __device__ inline bool aabbIntersectionTest(
+    const glm::vec3& bmin,
+    const glm::vec3& bmax,
+    const Ray& r)
+{
+    float tmin = (bmin.x - r.origin.x) / r.direction.x;
+    float tmax = (bmax.x - r.origin.x) / r.direction.x;
+    if (tmin > tmax) { float tmp = tmin; tmin = tmax; tmax = tmp; }
+
+    float tymin = (bmin.y - r.origin.y) / r.direction.y;
+    float tymax = (bmax.y - r.origin.y) / r.direction.y;
+    if (tymin > tymax) { float tmp = tymin; tymin = tymax; tymax = tmp; }
+
+    if ((tmin > tymax) || (tymin > tmax)) return false;
+    if (tymin > tmin) tmin = tymin;
+    if (tymax < tmax) tmax = tymax;
+
+    float tzmin = (bmin.z - r.origin.z) / r.direction.z;
+    float tzmax = (bmax.z - r.origin.z) / r.direction.z;
+    if (tzmin > tzmax) { float tmp = tzmin; tzmin = tzmax; tzmax = tmp; }
+
+    if ((tmin > tzmax) || (tzmin > tmax)) return false;
+    return true;
+}
+
+// Moller-Trumbore triangle intersection; returns distance or -1.
+__host__ __device__ float triangleIntersectionTest(
+    const Triangle& tri,
+    Ray r,
+    glm::vec3& intersectionPoint,
+    glm::vec3& normal,
+    bool& outside);
+
 // CHECKITOUT
 /**
  * Test intersection between a ray and a transformed cube. Untransformed,

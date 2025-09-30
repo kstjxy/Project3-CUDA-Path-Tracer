@@ -18,9 +18,10 @@
 class GuiDataContainer
 {
 public:
-    GuiDataContainer() : TracedDepth(0), SortByMaterial(true) {}
+    GuiDataContainer() : TracedDepth(0), SortByMaterial(true), UseMeshBoundsCulling(true) {}
     int TracedDepth;
     bool SortByMaterial;
+    bool UseMeshBoundsCulling;
 };
 
 namespace utilityCore
