@@ -18,10 +18,20 @@
 class GuiDataContainer
 {
 public:
-    GuiDataContainer() : TracedDepth(0), SortByMaterial(true), UseMeshBoundsCulling(true) {}
+    GuiDataContainer()
+        : TracedDepth(0)
+        , SortByMaterial(true)
+        , UseMeshBoundsCulling(true)
+        , UseRussianRoulette(true)
+        , RRStartDepth(5)
+        , RRProbCap(0.95f)
+    {}
     int TracedDepth;
     bool SortByMaterial;
     bool UseMeshBoundsCulling;
+    bool UseRussianRoulette;
+    int RRStartDepth;
+    float RRProbCap;
 };
 
 namespace utilityCore

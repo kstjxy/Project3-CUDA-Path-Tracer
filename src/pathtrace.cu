@@ -345,7 +345,10 @@ __global__ void shadeBSDF(
     ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
     Material* materials,
-    glm::vec3* image)
+    glm::vec3* image,
+    int useRR,
+    int rrStartDepth,
+    float rrProbCap)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_paths) return;
@@ -369,6 +372,28 @@ __global__ void shadeBSDF(
         thrust::default_random_engine rng = makeSeededRandomEngine(iter, path.pixelIndex, depth);
         glm::vec3 hitPoint = getPointOnRay(path.ray, isect.t);
         scatterRay(path, hitPoint, isect.surfaceNormal, m, rng);
+
+        // Russian roulette termination (unbiased)
+        if (useRR && depth >= rrStartDepth && path.remainingBounces > 0)
+        {
+            // Survival probability based on current throughput
+            float p = fminf(rrProbCap, fmaxf(path.color.x, fmaxf(path.color.y, path.color.z)));
+            p = fmaxf(p, 0.0f);
+
+            thrust::uniform_real_distribution<float> u01(0.f, 1.f);
+            float xi = u01(rng);
+            if (xi > p)
+            {
+                // terminate path
+                path.color = glm::vec3(0.0f);
+                path.remainingBounces = 0;
+            }
+            else if (p > 0.0f)
+            {
+                // keep path and scale throughput to keep estimator unbiased
+                path.color /= p;
+            }
+        }
 
         if (path.remainingBounces <= 0)
         {
@@ -510,7 +535,10 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_intersections,
             dev_paths,
             dev_materials,
-            dev_image
+            dev_image,
+            (guiData != NULL && guiData->UseRussianRoulette) ? 1 : 0,
+            (guiData != NULL) ? guiData->RRStartDepth : 5,
+            (guiData != NULL) ? guiData->RRProbCap : 0.95f
         );
         checkCUDAError("shade BSDF");
 

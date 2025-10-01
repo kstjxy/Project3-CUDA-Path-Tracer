@@ -286,6 +286,9 @@ void RenderImGui()
     //ImGui::Text("counter = %d", counter);
     ImGui::Checkbox("Sort by material", &imguiData->SortByMaterial);
     ImGui::Checkbox("Mesh bounds culling", &imguiData->UseMeshBoundsCulling);
+    ImGui::Checkbox("Russian roulette", &imguiData->UseRussianRoulette);
+    ImGui::SliderInt("RR start depth", &imguiData->RRStartDepth, 1, 64);
+    ImGui::SliderFloat("RR prob cap", &imguiData->RRProbCap, 0.5f, 1.0f, "%.2f");
     ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::End();
