@@ -125,8 +125,18 @@ void Scene::loadFromJSON(const std::string& jsonName)
         {
             const auto& col = p["RGB"];
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
-            const auto& roughness = p["ROUGHNESS"];
-            newMaterial.hasReflective = 1.0f - roughness;
+            newMaterial.specular.color = newMaterial.color;
+            const float roughness = p.value("ROUGHNESS", 0.0f);
+            // Treat as reflective with roughness controlling glossiness
+            newMaterial.hasReflective = 1.0f;
+            newMaterial.specular.exponent = roughness; // reuse exponent as roughness [0..1]
+        }
+        else if (p["TYPE"] == "Glass")
+        {
+            const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+            newMaterial.hasRefractive = 1.0f;
+            newMaterial.indexOfRefraction = p.value("IOR", 1.5f);
         }
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);

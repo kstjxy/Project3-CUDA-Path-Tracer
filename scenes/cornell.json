@@ -27,6 +27,18 @@
             "TYPE":"Specular",
             "RGB":[0.98, 0.98, 0.98],
             "ROUGHNESS":0.0
+        },
+        "specular_glossy":
+        {
+            "TYPE":"Specular",
+            "RGB":[0.98, 0.98, 0.98],
+            "ROUGHNESS":0.3
+        },
+        "glass":
+        {
+            "TYPE":"Glass",
+            "RGB":[1.0, 1.0, 1.0],
+            "IOR":1.5
         }
     },
     "Camera":
@@ -90,6 +102,20 @@
             "TRANS":[-1.0,4.0,-1.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[3.0,3.0,3.0]
+        },
+        {
+            "TYPE":"sphere",
+            "MATERIAL":"specular_glossy",
+            "TRANS":[-3.0,3.0,2.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[2.0,2.0,2.0]
+        },
+        {
+            "TYPE":"sphere",
+            "MATERIAL":"glass",
+            "TRANS":[2.5,3.0,1.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[2.0,2.0,2.0]
         }
     ]
 }

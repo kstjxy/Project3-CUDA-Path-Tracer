@@ -6,7 +6,7 @@
 
 __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal,
-    thrust::default_random_engine &rng)
+    thrust::default_random_engine& rng)
 {
     thrust::uniform_real_distribution<float> u01(0, 1);
 
@@ -44,15 +44,86 @@ __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__ glm::vec3 randomInUnitSphere(
+    thrust::default_random_engine& rng)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    while (true)
+    {
+        float x = u01(rng) * 2.0f - 1.0f;
+        float y = u01(rng) * 2.0f - 1.0f;
+        float z = u01(rng) * 2.0f - 1.0f;
+        glm::vec3 p(x, y, z);
+        if (glm::dot(p, p) < 1.0f)
+            return p;
+    }
+}
+
 __host__ __device__ void scatterRay(
-    PathSegment & pathSegment,
+    PathSegment& pathSegment,
     glm::vec3 intersect,
     glm::vec3 normal,
-    const Material &m,
-    thrust::default_random_engine &rng)
+    const Material& m,
+    thrust::default_random_engine& rng)
 {
-    // Diffuse scatter
     const float bias = EPSILON;
+    glm::vec3 wi = glm::normalize(pathSegment.ray.direction);
+
+    // Refractive (glass) material
+    if (m.hasRefractive > 0.0f && m.indexOfRefraction > 0.0f)
+    {
+        // Orientation and indices
+        glm::vec3 inDir = wi;
+        bool inside = glm::dot(inDir, normal) > 0.0f;
+        float etaI = inside ? m.indexOfRefraction : 1.0f;
+        float etaT = inside ? 1.0f : m.indexOfRefraction;
+        float eta = etaI / etaT;
+        glm::vec3 N = inside ? -normal : normal;
+
+        // Directions
+        float cosThetaI = glm::clamp(-glm::dot(inDir, N), 0.f, 1.f);
+        glm::vec3 reflectDir = glm::reflect(inDir, N);
+        glm::vec3 refractDir = glm::refract(inDir, N, eta);
+
+        // Fresnel via Schlick
+        float r0 = (etaT - etaI) / (etaT + etaI);
+        r0 = r0 * r0;
+        float fresnel = r0 + (1.0f - r0) * powf(1.0f - cosThetaI, 5.0f);
+
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        bool chooseReflect = (u01(rng) < fresnel) || (glm::dot(refractDir, refractDir) < 1e-12f);
+
+        glm::vec3 newDir = chooseReflect ? reflectDir : refractDir;
+        pathSegment.ray.direction = glm::normalize(newDir);
+        pathSegment.ray.origin = intersect + (chooseReflect ? N : -N);
+
+        pathSegment.color *= m.color;
+        pathSegment.remainingBounces -= 1;
+        return;
+    }
+
+    // Reflective / glossy material
+    if (m.hasReflective > 0.0f)
+    {
+        glm::vec3 R = glm::reflect(wi, normal);
+        float rough = m.specular.exponent; // interpret exponent as roughness [0..1]
+        if (rough > 0.0f)
+        {
+            glm::vec3 fuzz = rough * randomInUnitSphere(rng);
+            R = glm::normalize(R + fuzz);
+            if (glm::dot(R, normal) < 0.0f)
+            {
+                R = glm::reflect(R, normal);
+            }
+        }
+        pathSegment.color *= m.color;
+        pathSegment.ray.origin = intersect + normal * bias;
+        pathSegment.ray.direction = glm::normalize(R);
+        pathSegment.remainingBounces -= 1;
+        return;
+    }
+
+    // Diffuse scatter
     glm::vec3 newDir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
     pathSegment.color *= m.color;
     pathSegment.ray.origin = intersect + normal * bias;
