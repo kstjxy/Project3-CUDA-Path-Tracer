@@ -268,6 +268,22 @@ void Scene::loadFromJSON(const std::string& jsonName)
             const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
         }
+        else if (p["TYPE"] == "Marble")
+        {
+            // Procedural marble texture parameters
+            newMaterial.hasMarble = 1.0f;
+            auto c1 = p.value("RGB1", std::vector<float>{1.0f, 1.0f, 1.0f});
+            auto c2 = p.value("RGB2", std::vector<float>{0.8f, 0.8f, 0.8f});
+            newMaterial.marbleColor1 = glm::vec3(c1[0], c1[1], c1[2]);
+            newMaterial.marbleColor2 = glm::vec3(c2[0], c2[1], c2[2]);
+            newMaterial.marbleScale = p.value("SCALE", 1.0f);
+            newMaterial.marbleFrequency = p.value("FREQ", 6.0f);
+            newMaterial.marbleWarp = p.value("WARP", 2.0f);
+            newMaterial.marbleOctaves = p.value("OCTAVES", 5);
+            // Base color acts as additional tint
+            const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+        }
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
     }

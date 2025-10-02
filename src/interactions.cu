@@ -4,6 +4,70 @@
 
 #include <thrust/random.h>
 
+// ---------------- Procedural noise helpers (value noise + fBm) ----------------
+
+__host__ __device__ inline float _fract(float x) { return x - floorf(x); }
+__host__ __device__ inline float _lerp(float a, float b, float t) { return a + t * (b - a); }
+__host__ __device__ inline float _smooth(float t) { return t * t * (3.0f - 2.0f * t); }
+
+__host__ __device__ inline float hash31(const glm::vec3& p)
+{
+    // Single-value hash from 3D position
+    float n = glm::dot(p, glm::vec3(127.1f, 311.7f, 74.7f));
+    return _fract(sinf(n) * 43758.5453f);
+}
+
+__host__ __device__ float valueNoise3D(const glm::vec3& p)
+{
+    glm::vec3 i = glm::floor(p);
+    glm::vec3 f = p - i;
+    glm::vec3 u = glm::vec3(_smooth(f.x), _smooth(f.y), _smooth(f.z));
+
+    // 8 corners
+    float n000 = hash31(i + glm::vec3(0, 0, 0));
+    float n100 = hash31(i + glm::vec3(1, 0, 0));
+    float n010 = hash31(i + glm::vec3(0, 1, 0));
+    float n110 = hash31(i + glm::vec3(1, 1, 0));
+    float n001 = hash31(i + glm::vec3(0, 0, 1));
+    float n101 = hash31(i + glm::vec3(1, 0, 1));
+    float n011 = hash31(i + glm::vec3(0, 1, 1));
+    float n111 = hash31(i + glm::vec3(1, 1, 1));
+
+    float nx00 = _lerp(n000, n100, u.x);
+    float nx10 = _lerp(n010, n110, u.x);
+    float nx01 = _lerp(n001, n101, u.x);
+    float nx11 = _lerp(n011, n111, u.x);
+
+    float nxy0 = _lerp(nx00, nx10, u.y);
+    float nxy1 = _lerp(nx01, nx11, u.y);
+
+    return _lerp(nxy0, nxy1, u.z);
+}
+
+__host__ __device__ float fbm(const glm::vec3& p, int octaves)
+{
+    float v = 0.0f;
+    float amp = 0.5f;
+    float freq = 1.0f;
+    for (int i = 0; i < octaves; ++i)
+    {
+        v += amp * valueNoise3D(p * freq);
+        freq *= 2.0f;
+        amp *= 0.5f;
+    }
+    return v;
+}
+
+__host__ __device__ glm::vec3 evalMarble(const glm::vec3& pos, const Material& m)
+{
+    glm::vec3 pp = pos * m.marbleScale;
+    float wobble = m.marbleWarp * fbm(pp, m.marbleOctaves);
+    float t = m.marbleFrequency * pp.x + wobble * TWO_PI;
+    float s = 0.5f + 0.5f * sinf(t);
+    glm::vec3 base = (1.0f - s) * m.marbleColor2 + s * m.marbleColor1;
+    return base * m.color; // optional overall tint
+}
+
 __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal,
     thrust::default_random_engine& rng)
@@ -160,9 +224,10 @@ __host__ __device__ void scatterRay(
         return;
     }
 
-    // Diffuse scatter
+    // Diffuse scatter (with optional procedural textures)
     glm::vec3 newDir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    pathSegment.color *= m.color;
+    glm::vec3 surfColor = (m.hasMarble > 0.0f) ? evalMarble(intersect, m) : m.color;
+    pathSegment.color *= surfColor;
     pathSegment.ray.origin = intersect + normal * bias;
     pathSegment.ray.direction = newDir;
     pathSegment.remainingBounces -= 1;

@@ -46,6 +46,26 @@
             "SIGMA_A":[0.010, 0.005, 0.002],
             "SIGMA_S":[0.350, 0.300, 0.250],
             "RGB":[1.0, 0.95, 0.85]
+        },
+        "marble_white": {
+          "TYPE": "Marble",
+          "RGB1": [ 0.35, 0.35, 0.35 ],
+          "RGB2": [ 0.8, 0.8, 0.8 ],
+          "SCALE": 1.2,
+          "FREQ": 6.0,
+          "WARP": 2.0,
+          "OCTAVES": 5,
+          "RGB": [ 1.0, 1.0, 1.0 ]
+        },
+        "marble_blue": {
+          "TYPE": "Marble",
+          "RGB1": [ 0.15, 0.275, 0.88 ],
+          "RGB2": [ 0.6, 0.85, 0.98 ],
+          "SCALE": 1.2,
+          "FREQ": 6.0,
+          "WARP": 2.0,
+          "OCTAVES": 5,
+          "RGB": [ 1.0, 1.0, 1.0 ]
         }
     },
     "Camera":
@@ -55,7 +75,7 @@
         "ITERATIONS":5000,
         "DEPTH":8,
         "FILE":"cornell",
-        "EYE":[0.0,5.0,8.0],
+        "EYE":[0.0,5.0,5.0],
         "LOOKAT":[0.0,5.0,0.0],
         "UP":[0.0,1.0,0.0]
     },
@@ -104,15 +124,18 @@
             "SCALE":[0.01,10.0,10.0]
         },
         {
-          "TYPE": "trefoil_knot",
-          "MATERIAL": "diffuse_white",
-          "SEGMENTS": 256,
-          "RING_SEGMENTS": 24,
-          "KNOT_SCALE": 1.2,
-          "RADIUS": 0.15,
-          "TRANS": [ 0.0, 5.0, -2.0 ],
-          "ROTAT": [ 0.0, 0.0, 0.0 ],
-          "SCALE": [ 1.0, 1.0, 1.0 ]
+            "TYPE":"cube",
+            "MATERIAL":"marble_white",
+            "TRANS":[-2.5,2,-2.0],
+            "ROTAT":[0.0,45,0.0],
+            "SCALE":[2.0,2.0,2.0]
+        },
+        {
+            "TYPE":"sphere",
+            "MATERIAL":"marble_blue",
+            "TRANS":[2.5,2,-1.5],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[2.0,2.0,2.0]
         }
     ]
 }

@@ -63,6 +63,14 @@ struct Material
     float hasSubsurface = 0.0f;
     glm::vec3 sigmaA = glm::vec3(0.0f); // absorption
     glm::vec3 sigmaS = glm::vec3(0.0f); // scattering
+    // Procedural Marble texture
+    float hasMarble = 0.0f;
+    float marbleScale = 1.0f;
+    float marbleFrequency = 5.0f;
+    float marbleWarp = 1.0f;
+    int   marbleOctaves = 5;
+    glm::vec3 marbleColor1 = glm::vec3(1.0f); // vein color
+    glm::vec3 marbleColor2 = glm::vec3(0.8f); // base color
 };
 
 struct Camera

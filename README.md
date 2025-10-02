@@ -56,6 +56,28 @@ Specular Reflection and Refraction (Glass)
   - Handles total internal reflection.
 - Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
 
+Marble Texture (Procedural)
+---------------------------
+
+- Material type: `Marble` with parameters:
+  - `RGB1`: vein color (e.g., `[1.0, 1.0, 1.0]`)
+  - `RGB2`: base color (e.g., `[0.8, 0.8, 0.8]`)
+  - `SCALE`: spatial scale of the pattern (default 1.0–2.0)
+  - `FREQ`: base band frequency (default ~6.0)
+  - `WARP`: sine warp amplitude from fBm (default ~2.0)
+  - `OCTAVES`: fBm octaves (default 5)
+  - Optional `RGB`: overall tint multiplier
+- Implementation: 3D value-noise fBm + sine warp evaluated in world space at the hit point:
+  - `wobble = WARP * fBm(p * SCALE, OCTAVES)`
+  - `t = FREQ * p.x + wobble * 2π`
+  - `mix = 0.5 + 0.5 sin(t)` → `color = lerp(RGB2, RGB1, mix) * RGB`
+- Usage example in scene JSON:
+  - `{"TYPE":"Marble","RGB1":[1,1,1],"RGB2":[0.8,0.8,0.8],"SCALE":1.2,"FREQ":6,"WARP":2,"OCTAVES":5}`
+- Notes:
+  - World-space evaluation avoids UVs and works on any mesh (spheres, cubes, procedural shapes).
+  - Increase `WARP` or `OCTAVES` for more intricate veins; increase `SCALE` for larger features.
+  - Performance impact is low to moderate; each diffuse hit evaluates a handful of noise calls per octave.
+
 Trefoil Knot Tube (Procedural)
 ------------------------------
 
