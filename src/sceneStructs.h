@@ -71,6 +71,14 @@ struct Material
     int   marbleOctaves = 5;
     glm::vec3 marbleColor1 = glm::vec3(1.0f); // vein color
     glm::vec3 marbleColor2 = glm::vec3(0.8f); // base color
+    // Procedural Wood rings texture
+    float hasWood = 0.0f;
+    glm::vec3 woodLightColor = glm::vec3(0.8f, 0.7f, 0.5f);
+    glm::vec3 woodDarkColor  = glm::vec3(0.4f, 0.2f, 0.1f);
+    float woodScale = 1.0f;
+    float woodFrequency = 8.0f;
+    float woodNoiseAmp = 0.5f;
+    int   woodOctaves = 4;
 };
 
 struct Camera

@@ -385,6 +385,21 @@ void Scene::loadFromJSON(const std::string& jsonName)
             const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
         }
+        else if (p["TYPE"] == "Wood")
+        {
+            // Procedural wood rings
+            newMaterial.hasWood = 1.0f;
+            auto lrgb = p.value("LIGHT_RGB", std::vector<float>{0.8f, 0.7f, 0.5f});
+            auto drgb = p.value("DARK_RGB",  std::vector<float>{0.4f, 0.2f, 0.1f});
+            newMaterial.woodLightColor = glm::vec3(lrgb[0], lrgb[1], lrgb[2]);
+            newMaterial.woodDarkColor  = glm::vec3(drgb[0], drgb[1], drgb[2]);
+            newMaterial.woodScale     = p.value("SCALE", 1.0f);
+            newMaterial.woodFrequency = p.value("FREQ", 8.0f);
+            newMaterial.woodNoiseAmp  = p.value("NOISE", 0.5f);
+            newMaterial.woodOctaves   = p.value("OCTAVES", 4);
+            const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+        }
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
     }

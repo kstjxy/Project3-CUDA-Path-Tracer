@@ -78,6 +78,28 @@ Marble Texture (Procedural)
   - Increase `WARP` or `OCTAVES` for more intricate veins; increase `SCALE` for larger features.
   - Performance impact is low to moderate; each diffuse hit evaluates a handful of noise calls per octave.
 
+Wood Rings (Procedural)
+-----------------------
+
+- Material type: `Wood` with parameters:
+  - `LIGHT_RGB`: lighter ring color (e.g., `[0.85, 0.7, 0.5]`)
+  - `DARK_RGB`: darker ring color (e.g., `[0.4, 0.2, 0.1]`)
+  - `SCALE`: spatial scale (default 1.0–1.5)
+  - `FREQ`: ring frequency (default ~8–12)
+  - `NOISE`: wobble amplitude added via fBm (default ~0.4–0.6)
+  - `OCTAVES`: fBm octaves (default 4)
+  - Optional `RGB`: overall tint multiplier
+- Implementation: rings around the Y axis using world-space coordinates at the hit point:
+  - `r = length((x, z)) * SCALE`
+  - `rings = r * FREQ + NOISE * fBm(p, OCTAVES)`
+  - `t = fract(rings)` then smoothed; `color = lerp(DARK_RGB, LIGHT_RGB, t) * RGB`
+- Usage example in scene JSON:
+  - `{"TYPE":"Wood","LIGHT_RGB":[0.85,0.7,0.5],"DARK_RGB":[0.4,0.2,0.1],"SCALE":1.2,"FREQ":10,"NOISE":0.4,"OCTAVES":4}`
+- Notes:
+  - Looks great on curved tubes and terrains; adjust `FREQ`/`SCALE` to control ring width.
+  - Higher `NOISE` and `OCTAVES` add more natural wobble; lower values give clean rings.
+  - Wood currently overrides Marble if both are enabled on the same material.
+
 Trefoil Knot Tube (Procedural)
 ------------------------------
 

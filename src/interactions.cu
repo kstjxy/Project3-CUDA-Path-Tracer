@@ -68,6 +68,20 @@ __host__ __device__ glm::vec3 evalMarble(const glm::vec3& pos, const Material& m
     return base * m.color; // optional overall tint
 }
 
+__host__ __device__ glm::vec3 evalWood(const glm::vec3& pos, const Material& m)
+{
+    // Object/world space wood rings around Y axis
+    glm::vec3 pp = pos * m.woodScale;
+    float r = glm::length(glm::vec2(pp.x, pp.z));
+    float wobble = m.woodNoiseAmp * fbm(pp, m.woodOctaves);
+    float rings = r * m.woodFrequency + wobble;
+    float t = rings - floorf(rings); // fract(rings)
+    // Optional softening for more natural look
+    t = _smooth(t);
+    glm::vec3 base = (1.0f - t) * m.woodDarkColor + t * m.woodLightColor;
+    return base * m.color;
+}
+
 __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal,
     thrust::default_random_engine& rng)
@@ -226,7 +240,13 @@ __host__ __device__ void scatterRay(
 
     // Diffuse scatter (with optional procedural textures)
     glm::vec3 newDir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    glm::vec3 surfColor = (m.hasMarble > 0.0f) ? evalMarble(intersect, m) : m.color;
+    glm::vec3 surfColor = m.color;
+    if (m.hasMarble > 0.0f) {
+        surfColor = evalMarble(intersect, m);
+    }
+    if (m.hasWood > 0.0f) {
+        surfColor = evalWood(intersect, m);
+    }
     pathSegment.color *= surfColor;
     pathSegment.ray.origin = intersect + normal * bias;
     pathSegment.ray.direction = newDir;
