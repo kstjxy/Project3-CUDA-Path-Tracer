@@ -25,6 +25,9 @@ public:
         , UseRussianRoulette(true)
         , RRStartDepth(5)
         , RRProbCap(0.95f)
+        , UseDepthOfField(false)
+        , DOFLensRadius(0.03f)
+        , DOFFocalDistance(5.0f)
     {}
     int TracedDepth;
     bool SortByMaterial;
@@ -32,6 +35,10 @@ public:
     bool UseRussianRoulette;
     int RRStartDepth;
     float RRProbCap;
+    // Depth of field (thin-lens)
+    bool UseDepthOfField;
+    float DOFLensRadius;     // aperture radius in world units
+    float DOFFocalDistance;  // focus distance along camera forward
 };
 
 namespace utilityCore

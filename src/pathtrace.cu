@@ -157,7 +157,8 @@ void pathtraceFree()
 * motion blur - jitter rays "in time"
 * lens effect - jitter ray origin positions based on a lens
 */
-__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments)
+__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments,
+    int useDOF, float lensRadius, float focalDist)
 {
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -177,10 +178,34 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
         float sx = (float)x + jitterX;
         float sy = (float)y + jitterY;
-        segment.ray.direction = glm::normalize(cam.view
+
+        glm::vec3 pinholeDir = glm::normalize(cam.view
             - cam.right * cam.pixelLength.x * (sx - (float)cam.resolution.x * 0.5f)
             - cam.up    * cam.pixelLength.y * (sy - (float)cam.resolution.y * 0.5f)
         );
+
+        if (useDOF && lensRadius > 0.0f && focalDist > 0.0f)
+        {
+            // Sample a point on the lens (disk)
+            float r = sqrtf(u01(rng));
+            float theta = TWO_PI * u01(rng);
+            float dx = r * cosf(theta);
+            float dy = r * sinf(theta);
+            glm::vec3 lensOffset = lensRadius * (dx * cam.right + dy * cam.up);
+            glm::vec3 lensPos = cam.position + lensOffset;
+
+            // Compute point where the pinhole ray intersects the focal plane
+            float denom = glm::dot(pinholeDir, cam.view);
+            float tFocus = (denom != 0.0f) ? (focalDist / denom) : focalDist;
+            glm::vec3 pFocus = cam.position + pinholeDir * tFocus;
+
+            segment.ray.origin = lensPos;
+            segment.ray.direction = glm::normalize(pFocus - lensPos);
+        }
+        else
+        {
+            segment.ray.direction = pinholeDir;
+        }
 
         segment.pixelIndex = index;
         segment.remainingBounces = traceDepth;
@@ -478,7 +503,11 @@ void pathtrace(uchar4* pbo, int frame, int iter)
 
     // TODO: perform one iteration of path tracing
 
-    generateRayFromCamera<<<blocksPerGrid2d, blockSize2d>>>(cam, iter, traceDepth, dev_paths);
+    generateRayFromCamera<<<blocksPerGrid2d, blockSize2d>>>(
+        cam, iter, traceDepth, dev_paths,
+        (guiData != NULL && guiData->UseDepthOfField) ? 1 : 0,
+        (guiData != NULL) ? guiData->DOFLensRadius : 0.0f,
+        (guiData != NULL) ? guiData->DOFFocalDistance : 1.0f);
     checkCUDAError("generate camera ray");
 
     int depth = 0;

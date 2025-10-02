@@ -284,11 +284,21 @@ void RenderImGui()
     //    counter++;
     //ImGui::SameLine();
     //ImGui::Text("counter = %d", counter);
+    bool rrChanged = false;
+    bool dofChanged = false;
     ImGui::Checkbox("Sort by material", &imguiData->SortByMaterial);
     ImGui::Checkbox("Mesh bounds culling", &imguiData->UseMeshBoundsCulling);
-    ImGui::Checkbox("Russian roulette", &imguiData->UseRussianRoulette);
-    ImGui::SliderInt("RR start depth", &imguiData->RRStartDepth, 1, 64);
-    ImGui::SliderFloat("RR prob cap", &imguiData->RRProbCap, 0.5f, 1.0f, "%.2f");
+    rrChanged |= ImGui::Checkbox("Russian roulette", &imguiData->UseRussianRoulette);
+    rrChanged |= ImGui::SliderInt("RR start depth", &imguiData->RRStartDepth, 1, 64);
+    rrChanged |= ImGui::SliderFloat("RR prob cap", &imguiData->RRProbCap, 0.5f, 1.0f, "%.2f");
+    dofChanged |= ImGui::Checkbox("Depth of field", &imguiData->UseDepthOfField);
+    dofChanged |= ImGui::SliderFloat("DOF lens radius", &imguiData->DOFLensRadius, 0.0f, 0.25f, "%.3f");
+    dofChanged |= ImGui::SliderFloat("DOF focal distance", &imguiData->DOFFocalDistance, 0.1f, 50.0f, "%.2f");
+    if (dofChanged)
+    {
+        // Restart rendering to apply DOF changes
+        iteration = 0;
+    }
     ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::End();
