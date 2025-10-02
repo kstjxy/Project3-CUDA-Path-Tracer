@@ -1,11 +1,11 @@
-{
+﻿{
     "Materials":
     {
         "light":
         {
             "TYPE":"Emitting",
             "RGB":[1.0, 1.0, 1.0],
-            "EMITTANCE":5.0
+            "EMITTANCE":6.5
         },
         "diffuse_white":
         {
@@ -22,10 +22,15 @@
             "TYPE":"Diffuse",
             "RGB":[0.35, 0.85, 0.35]
         },
-        "specular_white":
+        "specular_white": {
+          "TYPE": "Specular",
+          "RGB": [ 0.98, 0.98, 0.98 ],
+          "ROUGHNESS": 0.0
+        },
+        "diffuse_grey":
         {
-            "TYPE":"Specular",
-            "RGB":[0.98, 0.98, 0.98],
+            "TYPE":"Diffuse",
+            "RGB":[0.5, 0.5, 0.5],
             "ROUGHNESS":0.0
         },
         "specular_glossy":
@@ -84,7 +89,7 @@
         {
           "TYPE": "cube",
           "MATERIAL": "light",
-          "TRANS": [ 0.0, 10.0, 8.0 ],
+          "TRANS": [ 0.0, 10.0, 6.0 ],
           "ROTAT": [ 0.0, 0.0, 0.0 ],
           "SCALE": [ 2.0, 2.0, 2.0 ]
         },
@@ -95,13 +100,6 @@
           "TRANS":[0.0,10.0,0.0],
           "ROTAT":[0.0,0.0,0.0],
           "SCALE":[3.0,0.3,3.0]
-        },
-        {
-            "TYPE":"cube",
-            "MATERIAL":"diffuse_white",
-            "TRANS":[0.0,0.0,0.0],
-            "ROTAT":[0.0,0.0,0.0],
-            "SCALE":[10.0,0.01,10.0]
         },
         {
             "TYPE":"cube",
@@ -132,15 +130,18 @@
             "SCALE":[0.01,10.0,10.0]
         },
         {
-          "TYPE": "trefoil_knot",
-          "MATERIAL": "diffuse_white",
-          "SEGMENTS": 256,
-          "RING_SEGMENTS": 24,
-          "KNOT_SCALE": 1.2,
-          "RADIUS": 0.15,
-          "TRANS": [ 0.0, 5.0, -2.0 ],
-          "ROTAT": [ 0.0, 0.0, 0.0 ],
-          "SCALE": [ 1.0, 1.0, 1.0 ]
+          "TYPE": "heightfield",
+          "MATERIAL": "diffuse_grey",
+          "GRID_X": 64,
+          "GRID_Z": 64,
+          "SIZE_X": 6,
+          "SIZE_Z": 6,
+          "HEIGHT": 1,
+          "NOISE_SCALE": 1.5,
+          "OCTAVES": 5,
+          "TRANS": [ 0,  0.6,-3],
+          "ROTAT": [ 0, 0, 0  ],
+          "SCALE": [ 1.5, 1.5, 1.5 ]
         }
     ]
 }

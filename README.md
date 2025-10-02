@@ -96,6 +96,25 @@ Trefoil Knot Tube (Procedural)
   - Torus Knot — general (p, q) formulation (trefoil is p=2, q=3): https://en.wikipedia.org/wiki/Torus_knot
   - PBRT v4 — Curves (rotation-minimizing frame): https://pbr-book.org/4ed/Shapes/Curves
 
+Procedural Heightfield Terrain
+-----------------------------
+
+- Object type: `heightfield` generated at load time as a triangle mesh.
+- Parameters (JSON):
+  - `GRID_X`, `GRID_Z`: vertex resolution along X/Z (controls mesh density)
+  - `SIZE_X`, `SIZE_Z`: world-space extent of the terrain
+  - `HEIGHT`: vertical amplitude (peak/trough height)
+  - `NOISE_SCALE`: frequency of the driving noise (higher → finer features)
+  - `OCTAVES`: number of fBm layers (higher → more small-scale detail)
+  - Standard `TRANS`, `ROTAT`, `SCALE` are supported
+- Implementation: 2D value-noise fBm drives height y over an XZ grid; two triangles per quad are emitted and a world-space AABB is computed for optional culling.
+- Usage example:
+  - `{ "TYPE":"heightfield", "MATERIAL":"diffuse_white", "GRID_X":64, "GRID_Z":64, "SIZE_X":6.0, "SIZE_Z":6.0, "HEIGHT":0.6, "NOISE_SCALE":1.2, "OCTAVES":5, "TRANS":[0,0.6,-3], "ROTAT":[0,0,0], "SCALE":[1,1,1] }`
+- Notes:
+  - Increase `GRID_X/Z` for smoother silhouettes; this increases triangle count.
+  - Pair `SIZE_X/Z` changes with `NOISE_SCALE` to keep features visually consistent.
+  - Apply any material, including procedural ones (e.g., Marble), since evaluation is in world/object space.
+
 Subsurface Scattering (Approx.)
 -------------------------------
 

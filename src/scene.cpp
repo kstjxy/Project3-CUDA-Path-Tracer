@@ -198,6 +198,107 @@ static void generateTrefoilTube(const glm::mat4& transform,
     }
 }
 
+// ---------------- Procedural Heightfield (grid mesh with fBm heights) ----------------
+
+static inline float fractf(float x) { return x - floorf(x); }
+static inline float lerpf(float a, float b, float t) { return a + t * (b - a); }
+static inline float smoothf(float t) { return t * t * (3.0f - 2.0f * t); }
+
+static float hash21(const glm::vec2& p)
+{
+    float n = glm::dot(p, glm::vec2(127.1f, 311.7f));
+    return fractf(sinf(n) * 43758.5453f);
+}
+
+static float valueNoise2D(const glm::vec2& p)
+{
+    glm::vec2 i = glm::floor(p);
+    glm::vec2 f = p - i;
+    glm::vec2 u = glm::vec2(smoothf(f.x), smoothf(f.y));
+
+    float n00 = hash21(i + glm::vec2(0, 0));
+    float n10 = hash21(i + glm::vec2(1, 0));
+    float n01 = hash21(i + glm::vec2(0, 1));
+    float n11 = hash21(i + glm::vec2(1, 1));
+
+    float nx0 = lerpf(n00, n10, u.x);
+    float nx1 = lerpf(n01, n11, u.x);
+    return lerpf(nx0, nx1, u.y);
+}
+
+static float fbm2D(const glm::vec2& p, int octaves)
+{
+    float v = 0.0f;
+    float amp = 0.5f;
+    float freq = 1.0f;
+    for (int i = 0; i < octaves; ++i)
+    {
+        v += amp * valueNoise2D(p * freq);
+        freq *= 2.0f;
+        amp *= 0.5f;
+    }
+    return v;
+}
+
+static void generateHeightfield(const glm::mat4& transform,
+                                int materialId,
+                                int gridX,
+                                int gridZ,
+                                float sizeX,
+                                float sizeZ,
+                                float heightScale,
+                                float noiseScale,
+                                int octaves,
+                                std::vector<Triangle>& outTris,
+                                glm::vec3& outMin,
+                                glm::vec3& outMax)
+{
+    gridX = std::max(gridX, 2);
+    gridZ = std::max(gridZ, 2);
+    outMin = glm::vec3(FLT_MAX);
+    outMax = glm::vec3(-FLT_MAX);
+
+    const int vx = gridX;
+    const int vz = gridZ;
+    std::vector<glm::vec3> verts(vx * vz);
+
+    for (int j = 0; j < vz; ++j)
+    {
+        for (int i = 0; i < vx; ++i)
+        {
+            float u = (vx > 1) ? (float)i / (float)(vx - 1) : 0.0f;
+            float v = (vz > 1) ? (float)j / (float)(vz - 1) : 0.0f;
+            float x = (u - 0.5f) * sizeX;
+            float z = (v - 0.5f) * sizeZ;
+            float h = heightScale * fbm2D(glm::vec2(x, z) * noiseScale, octaves);
+            glm::vec3 pw = glm::vec3(transform * glm::vec4(x, h, z, 1.0f));
+            verts[j * vx + i] = pw;
+            outMin = glm::min(outMin, pw);
+            outMax = glm::max(outMax, pw);
+        }
+    }
+
+    // Build two triangles per quad
+    for (int j = 0; j < vz - 1; ++j)
+    {
+        for (int i = 0; i < vx - 1; ++i)
+        {
+            int i00 = j * vx + i;
+            int i10 = j * vx + (i + 1);
+            int i01 = (j + 1) * vx + i;
+            int i11 = (j + 1) * vx + (i + 1);
+
+            const glm::vec3& v00 = verts[i00];
+            const glm::vec3& v10 = verts[i10];
+            const glm::vec3& v01 = verts[i01];
+            const glm::vec3& v11 = verts[i11];
+
+            outTris.push_back(Triangle{ v00, v10, v11, materialId });
+            outTris.push_back(Triangle{ v00, v11, v01, materialId });
+        }
+    }
+}
+
 Scene::Scene(string filename)
 {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -309,6 +410,10 @@ void Scene::loadFromJSON(const std::string& jsonName)
             // Represent as a mesh of triangles
             newGeom.type = MESH;
         }
+        else if (type == "heightfield")
+        {
+            newGeom.type = MESH;
+        }
         else
         {
             newGeom.type = SPHERE;
@@ -352,6 +457,24 @@ void Scene::loadFromJSON(const std::string& jsonName)
                 glm::vec3 bbMin, bbMax;
                 generateTrefoilTube(newGeom.transform, newGeom.materialid,
                                     segments, ringSegments, knotScale, tubeRadius,
+                                    triangles, bbMin, bbMax);
+                newGeom.triCount = static_cast<int>(triangles.size()) - newGeom.triStart;
+                newGeom.bboxMin = bbMin;
+                newGeom.bboxMax = bbMax;
+            }
+            else if (type == "heightfield")
+            {
+                int gridX = p.value("GRID_X", 64);
+                int gridZ = p.value("GRID_Z", 64);
+                float sizeX = p.value("SIZE_X", 6.0f);
+                float sizeZ = p.value("SIZE_Z", 6.0f);
+                float heightScale = p.value("HEIGHT", 0.6f);
+                float noiseScale = p.value("NOISE_SCALE", 1.2f);
+                int octaves = p.value("OCTAVES", 5);
+                newGeom.triStart = static_cast<int>(triangles.size());
+                glm::vec3 bbMin, bbMax;
+                generateHeightfield(newGeom.transform, newGeom.materialid,
+                                    gridX, gridZ, sizeX, sizeZ, heightScale, noiseScale, octaves,
                                     triangles, bbMin, bbMax);
                 newGeom.triCount = static_cast<int>(triangles.size()) - newGeom.triStart;
                 newGeom.bboxMin = bbMin;
