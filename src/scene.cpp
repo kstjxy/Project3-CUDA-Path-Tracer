@@ -4,6 +4,7 @@
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/norm.hpp>
 #include "json.hpp"
 
 #include <fstream>
@@ -76,6 +77,123 @@ static void loadOBJMesh(const std::string& filename,
                 outMin = glm::min(outMin, glm::min(w0, glm::min(w1, w2)));
                 outMax = glm::max(outMax, glm::max(w0, glm::max(w1, w2)));
             }
+        }
+    }
+}
+
+// Generate a trefoil knot tube by sweeping a circular cross section along a trefoil curve
+static void generateTrefoilTube(const glm::mat4& transform,
+                                int materialId,
+                                int segments,
+                                int ringSegments,
+                                float knotScale,
+                                float tubeRadius,
+                                std::vector<Triangle>& outTris,
+                                glm::vec3& outMin,
+                                glm::vec3& outMax)
+{
+    segments = std::max(segments, 3);
+    ringSegments = std::max(ringSegments, 3);
+    const float twoPi = TWO_PI;
+    const float dt = twoPi / segments;
+
+    std::vector<glm::vec3> centers(segments);
+    std::vector<glm::vec3> tangents(segments);
+    std::vector<glm::vec3> normals(segments);
+    std::vector<glm::vec3> binormals(segments);
+
+    auto trefoil = [knotScale](float t) {
+        float c3 = cosf(3.0f * t);
+        float s3 = sinf(3.0f * t);
+        float c2 = cosf(2.0f * t);
+        float s2 = sinf(2.0f * t);
+        glm::vec3 p;
+        p.x = (2.0f + c3) * c2;
+        p.y = (2.0f + c3) * s2;
+        p.z = s3;
+        return knotScale * p;
+    };
+
+    // Centers and tangents
+    for (int i = 0; i < segments; ++i)
+    {
+        float t = i * dt;
+        int ip = (i + 1) % segments;
+        int im = (i - 1 + segments) % segments;
+        centers[i] = trefoil(t);
+        glm::vec3 cNext = trefoil((i + 1) * dt);
+        glm::vec3 cPrev = trefoil((i - 1 + segments) * dt);
+        tangents[i] = glm::normalize(cNext - cPrev);
+    }
+
+    // Initialize frame with a reasonable up
+    glm::vec3 up = glm::vec3(0, 1, 0);
+    if (fabsf(glm::dot(up, tangents[0])) > 0.9f) up = glm::vec3(1, 0, 0);
+    normals[0] = glm::normalize(glm::cross(up, tangents[0]));
+    binormals[0] = glm::normalize(glm::cross(tangents[0], normals[0]));
+
+    // Parallel transport frame
+    for (int i = 1; i < segments; ++i)
+    {
+        glm::vec3 Ti = tangents[i];
+        glm::vec3 Ni_1 = normals[i - 1];
+        glm::vec3 Ni = Ni_1 - Ti * glm::dot(Ti, Ni_1);
+        if (glm::length2(Ni) < 1e-8f)
+        {
+            // fallback
+            glm::vec3 v = fabsf(Ti.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+            Ni = glm::normalize(glm::cross(v, Ti));
+        }
+        else
+        {
+            Ni = glm::normalize(Ni);
+        }
+        glm::vec3 Bi = glm::normalize(glm::cross(Ti, Ni));
+        normals[i] = Ni;
+        binormals[i] = Bi;
+    }
+
+    // Precompute ring directions in local frame
+    std::vector<glm::vec2> ringDirs(ringSegments);
+    for (int j = 0; j < ringSegments; ++j)
+    {
+        float a = (j * twoPi) / ringSegments;
+        ringDirs[j] = glm::vec2(cosf(a), sinf(a));
+    }
+
+    // Generate vertices per ring
+    std::vector<std::vector<glm::vec3>> verts(segments, std::vector<glm::vec3>(ringSegments));
+    outMin = glm::vec3(FLT_MAX);
+    outMax = glm::vec3(-FLT_MAX);
+    for (int i = 0; i < segments; ++i)
+    {
+        const glm::vec3& C = centers[i];
+        const glm::vec3& N = normals[i];
+        const glm::vec3& B = binormals[i];
+        for (int j = 0; j < ringSegments; ++j)
+        {
+            glm::vec3 p = C + tubeRadius * (ringDirs[j].x * N + ringDirs[j].y * B);
+            glm::vec3 pw = glm::vec3(transform * glm::vec4(p, 1.0f));
+            verts[i][j] = pw;
+            outMin = glm::min(outMin, pw);
+            outMax = glm::max(outMax, pw);
+        }
+    }
+
+    // Emit triangles
+    outTris.reserve(outTris.size() + segments * ringSegments * 2);
+    for (int i = 0; i < segments; ++i)
+    {
+        int i1 = (i + 1) % segments;
+        for (int j = 0; j < ringSegments; ++j)
+        {
+            int j1 = (j + 1) % ringSegments;
+            const glm::vec3& v00 = verts[i][j];
+            const glm::vec3& v01 = verts[i][j1];
+            const glm::vec3& v10 = verts[i1][j];
+            const glm::vec3& v11 = verts[i1][j1];
+            outTris.push_back(Triangle{ v00, v10, v11, materialId });
+            outTris.push_back(Triangle{ v00, v11, v01, materialId });
         }
     }
 }
@@ -170,6 +288,11 @@ void Scene::loadFromJSON(const std::string& jsonName)
         {
             newGeom.type = MESH;
         }
+        else if (type == "trefoil_knot")
+        {
+            // Represent as a mesh of triangles
+            newGeom.type = MESH;
+        }
         else
         {
             newGeom.type = SPHERE;
@@ -187,15 +310,33 @@ void Scene::loadFromJSON(const std::string& jsonName)
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
         if (newGeom.type == MESH)
         {
-            std::string fileRel = p.value("FILE", std::string());
-            if (fileRel.empty()) {
-                std::cerr << "Mesh object missing FILE path. Skipping.\n";
-            } else {
-                std::filesystem::path full = fileRel;
-                if (full.is_relative()) full = baseDir / full;
+            if (type == "mesh")
+            {
+                std::string fileRel = p.value("FILE", std::string());
+                if (fileRel.empty()) {
+                    std::cerr << "Mesh object missing FILE path. Skipping.\n";
+                } else {
+                    std::filesystem::path full = fileRel;
+                    if (full.is_relative()) full = baseDir / full;
+                    newGeom.triStart = static_cast<int>(triangles.size());
+                    glm::vec3 bbMin, bbMax;
+                    loadOBJMesh(full.string(), newGeom.transform, newGeom.materialid, triangles, bbMin, bbMax);
+                    newGeom.triCount = static_cast<int>(triangles.size()) - newGeom.triStart;
+                    newGeom.bboxMin = bbMin;
+                    newGeom.bboxMax = bbMax;
+                }
+            }
+            else if (type == "trefoil_knot")
+            {
+                int segments = p.value("SEGMENTS", 256);
+                int ringSegments = p.value("RING_SEGMENTS", 16);
+                float knotScale = p.value("KNOT_SCALE", 2.0f);
+                float tubeRadius = p.value("RADIUS", 0.15f);
                 newGeom.triStart = static_cast<int>(triangles.size());
                 glm::vec3 bbMin, bbMax;
-                loadOBJMesh(full.string(), newGeom.transform, newGeom.materialid, triangles, bbMin, bbMax);
+                generateTrefoilTube(newGeom.transform, newGeom.materialid,
+                                    segments, ringSegments, knotScale, tubeRadius,
+                                    triangles, bbMin, bbMax);
                 newGeom.triCount = static_cast<int>(triangles.size()) - newGeom.triStart;
                 newGeom.bboxMin = bbMin;
                 newGeom.bboxMax = bbMax;

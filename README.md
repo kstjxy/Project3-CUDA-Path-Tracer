@@ -56,6 +56,24 @@ Specular Reflection and Refraction (Glass)
   - Handles total internal reflection.
 - Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
 
+Trefoil Knot Tube (Procedural)
+------------------------------
+
+- Object type: `trefoil_knot` generated at load time, represented as a triangle mesh.
+- Parameters (JSON):
+  - `SEGMENTS` (default 256): samples along the knot curve
+  - `RING_SEGMENTS` (default 16-24): samples around the tube cross section
+  - `KNOT_SCALE` (default 2.0): overall knot size (world units)
+  - `RADIUS` (default 0.15): tube radius (world units)
+- Transform fields (`TRANS`, `ROTAT`, `SCALE`) are applied as usual.
+- Implementation outline:
+  - Use a torus-knot parametric curve; trefoil is the (p=2, q=3) case.
+  - Construct a rotation-minimizing (parallel transport) frame along the curve to sweep a circle with minimal twist.
+  - Emit triangle strips between adjacent rings; compute a world-space AABB for optional bounds culling.
+- References:
+  - Torus Knot — general (p, q) formulation (trefoil is p=2, q=3): https://en.wikipedia.org/wiki/Torus_knot
+  - PBRT v4 — Curves (rotation-minimizing frame): https://pbr-book.org/4ed/Shapes/Curves
+
 Subsurface Scattering (Approx.)
 -------------------------------
 
