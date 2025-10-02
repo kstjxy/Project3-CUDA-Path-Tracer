@@ -102,6 +102,43 @@ __host__ __device__ void scatterRay(
         return;
     }
 
+    // Subsurface scattering
+    if (m.hasSubsurface > 0.0f)
+    {
+        glm::vec3 n = glm::normalize(normal);
+        glm::vec3 directionNotNormal = (fabsf(n.x) < SQRT_OF_ONE_THIRD) ? glm::vec3(1, 0, 0)
+            : (fabsf(n.y) < SQRT_OF_ONE_THIRD) ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
+        glm::vec3 t1 = glm::normalize(glm::cross(n, directionNotNormal));
+        glm::vec3 t2 = glm::normalize(glm::cross(n, t1));
+
+        // mfp = 1 / sigma_t
+        glm::vec3 sigmaT = m.sigmaA + m.sigmaS;
+        float sigmaT_scalar = fmaxf(1e-6f, (sigmaT.x + sigmaT.y + sigmaT.z) / 3.0f);
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float u1 = u01(rng);
+        float u2 = u01(rng);
+        float rd = 1.0f / sigmaT_scalar;
+        float r = -rd * logf(fmaxf(1e-6f, 1.0f - u1));
+        float phi = TWO_PI * u2;
+        glm::vec3 lateral = r * (cosf(phi) * t1 + sinf(phi) * t2);
+        glm::vec3 newPoint = intersect + lateral;
+
+        // Cosine-weighted outgoing direction
+        glm::vec3 newDir = glm::normalize(calculateRandomDirectionInHemisphere(n, rng));
+
+        glm::vec3 albedo = glm::vec3(
+            sigmaT.x > 0 ? m.sigmaS.x / sigmaT.x : 0.0f,
+            sigmaT.y > 0 ? m.sigmaS.y / sigmaT.y : 0.0f,
+            sigmaT.z > 0 ? m.sigmaS.z / sigmaT.z : 0.0f);
+        glm::vec3 att = glm::exp(-m.sigmaA * r);
+        pathSegment.color *= (albedo * att * m.color);
+
+        pathSegment.ray.origin = newPoint + n * bias;
+        pathSegment.ray.direction = newDir;
+        pathSegment.remainingBounces -= 1;
+        return;
+    }
+
     // Reflective / glossy material
     if (m.hasReflective > 0.0f)
     {

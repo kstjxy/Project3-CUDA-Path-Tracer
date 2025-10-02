@@ -39,6 +39,13 @@
             "TYPE":"Glass",
             "RGB":[1.0, 1.0, 1.0],
             "IOR":1.5
+        },
+        "Wax":
+        {
+            "TYPE":"Subsurface",
+            "SIGMA_A":[0.010, 0.005, 0.002],
+            "SIGMA_S":[0.350, 0.300, 0.250],
+            "RGB":[1.0, 0.95, 0.85]
         }
     },
     "Camera":
@@ -99,7 +106,7 @@
         {
             "TYPE":"sphere",
             "MATERIAL":"specular_white",
-            "TRANS":[-1.0,4.0,-1.0],
+            "TRANS":[-1.0,4.0,-2.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[3.0,3.0,3.0]
         },
@@ -116,6 +123,20 @@
             "TRANS":[2.5,3.0,1.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[2.0,2.0,2.0]
+        },
+        {
+          "TYPE": "sphere",
+          "MATERIAL": "Wax",
+          "TRANS": [ -2.0, 2.5, 1.0 ],
+          "ROTAT": [ 0.0, 0.0, 0.0 ],
+          "SCALE": [ 3.0, 3.0, 3.0 ]
+        },
+        {
+          "TYPE": "sphere",
+          "MATERIAL": "diffuse_white",
+          "TRANS": [ 2.0, 2.5, 1.0 ],
+          "ROTAT": [ 0.0, 0.0, 0.0 ],
+          "SCALE": [ 3.0, 3.0, 3.0 ]
         }
     ]
 }

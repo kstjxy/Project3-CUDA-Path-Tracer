@@ -138,6 +138,18 @@ void Scene::loadFromJSON(const std::string& jsonName)
             newMaterial.hasRefractive = 1.0f;
             newMaterial.indexOfRefraction = p.value("IOR", 1.5f);
         }
+        else if (p["TYPE"] == "Subsurface")
+        {
+            // Simple SSS: specify absorption (sigma_a) and scattering (sigma_s)
+            auto a = p.value("SIGMA_A", std::vector<float>{0.1f, 0.1f, 0.1f});
+            auto s = p.value("SIGMA_S", std::vector<float>{1.0f, 1.0f, 1.0f});
+            newMaterial.sigmaA = glm::vec3(a[0], a[1], a[2]);
+            newMaterial.sigmaS = glm::vec3(s[0], s[1], s[2]);
+            newMaterial.hasSubsurface = 1.0f;
+            // Optional tint color multiplies final throughput
+            const auto& col = p.value("RGB", std::vector<float>{1.0f, 1.0f, 1.0f});
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+        }
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
     }

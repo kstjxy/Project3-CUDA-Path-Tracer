@@ -56,6 +56,21 @@ Specular Reflection and Refraction (Glass)
   - Handles total internal reflection.
 - Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
 
+Subsurface Scattering (Approx.)
+-------------------------------
+
+- Adds a `Subsurface` material with parameters:
+  - `SIGMA_A`: absorption coefficients (RGB)
+  - `SIGMA_S`: scattering coefficients (RGB)
+  - Optional `RGB` tint multiplier
+- Implementation uses an approximate BSSRDF via a single radial diffusion step on the surface:
+  - Sample a radial distance `r ~ exp(1/σ_t)` around the hit point on the tangent plane.
+  - Move to the new surface location and sample a cosine-weighted outgoing direction.
+  - Apply Beer–Lambert attenuation `exp(-σ_a r)` and multiply by albedo `σ_s / σ_t` and tint.
+- This is a lightweight approximation inspired by diffusion profiles; it captures soft subsurface look with low overhead.
+- Usage example in scene JSON:
+  - `{"TYPE":"Subsurface", "SIGMA_A":[0.1,0.05,0.02], "SIGMA_S":[1.0,0.8,0.6], "RGB":[1.0,0.9,0.8]}`
+
 
 OBJ Mesh Loading
 ----------------

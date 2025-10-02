@@ -59,6 +59,10 @@ struct Material
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    // Subsurface scattering parameters (approximate)
+    float hasSubsurface = 0.0f;
+    glm::vec3 sigmaA = glm::vec3(0.0f); // absorption
+    glm::vec3 sigmaS = glm::vec3(0.0f); // scattering
 };
 
 struct Camera
