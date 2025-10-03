@@ -3,13 +3,27 @@
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* Author: Crystal Jin
+  *  [LinkedIn](https://www.linkedin.com/in/xiaoyue-jin), [personal website](https://xiaoyuejin.com)
 
-### (TODO: Your README)
+* Tested on: Windows 11, i7-14700K @ 3.40GHz, 64GB RAM, NVIDIA GeForce RTX 4080 SUPER
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
+Core Features
+-------------
+
+- Ideal Diffuse BSDF (PBRT v4 9.2)
+  - Diffuse bounces use cosine‑weighted hemisphere sampling to choose the outgoing direction and multiply path throughput by the material albedo.
+  - Implemented in `src/interactions.cu` via `calculateRandomDirectionInHemisphere` and applied in `scatterRay` for non‑specular, non‑refractive materials.
+
+- Material‑Contiguous Shading (toggleable)
+  - Path segments are sorted by hit material before shading to increase coherence and reduce warp divergence when different BSDFs do different amounts of work.
+  - Implemented in `src/pathtrace.cu` using a per‑path material key and `thrust::sort_by_key` on intersections + paths.
+  - Toggle in the ImGui panel: “Sort by material”. When enabled, expect improved performance (fewer divergent branches, better cache locality and memory access patterns) especially in scenes with varied materials.
+
+- Stochastic Antialiasing
+  - Sub‑pixel jitter per camera ray produces stochastic sampling over the pixel footprint.
+  - Implemented in `src/pathtrace.cu` in `generateRayFromCamera` by jittering `(x, y)` within the pixel using a seeded RNG. Enabled by default.
+  - Reference: Paul Bourke’s “Stochastic Sampling”.
 
 Russian Roulette Path Termination
 ---------------------------------
@@ -30,6 +44,13 @@ How To Evaluate Performance
 - Compare with `Russian roulette` enabled vs disabled, keeping all other settings identical.
 - Expected: noticeable speedup in closed scenes due to early termination of low-throughput paths, with negligible bias (estimator remains unbiased by survival scaling).
 
+Analysis
+- Overview: Unbiased termination of low‑throughput paths after a start depth using Fresnel‑safe scaling (divide by survival probability) to keep the estimator unbiased.
+- Performance: Typically reduces ms/frame by 10–40% in closed scenes and ones with many low‑energy bounces; little impact in open scenes dominated by early escapes.
+- Acceleration: Cap survival probability (e.g., 0.95) and start at a modest depth (≈5) to reduce variance spikes; keep stream compaction enabled to quickly drop dead paths.
+- GPU vs CPU: Both benefit, but GPUs especially due to fewer long‑tail warps; divergence in path lengths is mitigated by per‑bounce compaction and material sorting.
+- Future: Adaptive start depth per material/throughput; albedo‑based survival probability; combine with next‑event estimation to reduce variance further.
+
 Physically-Based Depth of Field (Thin Lens)
 -------------------------------------------
 
@@ -42,7 +63,14 @@ Physically-Based Depth of Field (Thin Lens)
 - Implementation:
   - Compute pinhole direction per pixel (with AA jitter).
   - If enabled, sample a disk on the lens: `lensPos = cam.position + lensRadius*(dx*right + dy*up)`.
-  - Intersect pinhole ray with the focal plane to find `pFocus` and set ray direction to `normalize(pFocus - lensPos)`.
+- Intersect pinhole ray with the focal plane to find `pFocus` and set ray direction to `normalize(pFocus - lensPos)`.
+
+Analysis
+- Overview: Thin‑lens camera samples a disk aperture and focuses rays onto a plane at `focalDist`, producing realistic defocus blur and bokeh.
+- Performance: Negligible cost per ray (a few RNG calls and math); convergence in defocus regions can be slower visually due to blur, but per‑iteration time is unchanged.
+- Acceleration: Keep aperture radius modest and clamp aberrant `tFocus` to avoid extreme rays; restart accumulation when toggled to avoid mixing distributions.
+- GPU vs CPU: Equally suited—the work happens once per primary ray; no heavy divergence; excellent GPU fit.
+- Future: Polygonal/annular apertures, anamorphic lenses, autofocus (pick focal plane by depth), and importance sampling the lens by pixel circle of confusion.
 
 Specular Reflection and Refraction (Glass)
 ------------------------------------------
@@ -56,86 +84,46 @@ Specular Reflection and Refraction (Glass)
   - Handles total internal reflection.
 - Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
 
-Marble Texture (Procedural)
----------------------------
+Analysis
+- Overview: Dielectric (glass/water) uses Schlick Fresnel to stochastically choose reflection vs refraction; robust TIR check via `glm::refract` fallback.
+- Performance: Slightly higher shading cost and potentially more bounces from internal reflections; can increase divergence—material sorting helps.
+- Acceleration: Early exit on light hits; keep epsilon offsets consistent; optional RR on internal bounces reduces tail cost.
+- GPU vs CPU: GPU benefits when many pixels hit the same material due to SIMT; divergence across mixed dielectrics is mitigated by sorting.
+- Future: Microfacet rough dielectrics (GGX), spectral dispersion (wavelength‑dependent IOR), multiple importance sampling with environment lights.
 
-- Material type: `Marble` with parameters:
-  - `RGB1`: vein color (e.g., `[1.0, 1.0, 1.0]`)
-  - `RGB2`: base color (e.g., `[0.8, 0.8, 0.8]`)
-  - `SCALE`: spatial scale of the pattern (default 1.0–2.0)
-  - `FREQ`: base band frequency (default ~6.0)
-  - `WARP`: sine warp amplitude from fBm (default ~2.0)
-  - `OCTAVES`: fBm octaves (default 5)
-  - Optional `RGB`: overall tint multiplier
-- Implementation: 3D value-noise fBm + sine warp evaluated in world space at the hit point:
-  - `wobble = WARP * fBm(p * SCALE, OCTAVES)`
-  - `t = FREQ * p.x + wobble * 2π`
-  - `mix = 0.5 + 0.5 sin(t)` → `color = lerp(RGB2, RGB1, mix) * RGB`
-- Usage example in scene JSON:
-  - `{"TYPE":"Marble","RGB1":[1,1,1],"RGB2":[0.8,0.8,0.8],"SCALE":1.2,"FREQ":6,"WARP":2,"OCTAVES":5}`
-- Notes:
-  - World-space evaluation avoids UVs and works on any mesh (spheres, cubes, procedural shapes).
-  - Increase `WARP` or `OCTAVES` for more intricate veins; increase `SCALE` for larger features.
-  - Performance impact is low to moderate; each diffuse hit evaluates a handful of noise calls per octave.
-
-Wood Rings (Procedural)
------------------------
-
-- Material type: `Wood` with parameters:
-  - `LIGHT_RGB`: lighter ring color (e.g., `[0.85, 0.7, 0.5]`)
-  - `DARK_RGB`: darker ring color (e.g., `[0.4, 0.2, 0.1]`)
-  - `SCALE`: spatial scale (default 1.0–1.5)
-  - `FREQ`: ring frequency (default ~8–12)
-  - `NOISE`: wobble amplitude added via fBm (default ~0.4–0.6)
-  - `OCTAVES`: fBm octaves (default 4)
-  - Optional `RGB`: overall tint multiplier
-- Implementation: rings around the Y axis using world-space coordinates at the hit point:
-  - `r = length((x, z)) * SCALE`
-  - `rings = r * FREQ + NOISE * fBm(p, OCTAVES)`
-  - `t = fract(rings)` then smoothed; `color = lerp(DARK_RGB, LIGHT_RGB, t) * RGB`
-- Usage example in scene JSON:
-  - `{"TYPE":"Wood","LIGHT_RGB":[0.85,0.7,0.5],"DARK_RGB":[0.4,0.2,0.1],"SCALE":1.2,"FREQ":10,"NOISE":0.4,"OCTAVES":4}`
-- Notes:
-  - Looks great on curved tubes and terrains; adjust `FREQ`/`SCALE` to control ring width.
-  - Higher `NOISE` and `OCTAVES` add more natural wobble; lower values give clean rings.
-  - Wood currently overrides Marble if both are enabled on the same material.
-
-Trefoil Knot Tube (Procedural)
-------------------------------
-
-- Object type: `trefoil_knot` generated at load time, represented as a triangle mesh.
-- Parameters (JSON):
-  - `SEGMENTS` (default 256): samples along the knot curve
-  - `RING_SEGMENTS` (default 16-24): samples around the tube cross section
-  - `KNOT_SCALE` (default 2.0): overall knot size (world units)
-  - `RADIUS` (default 0.15): tube radius (world units)
-- Transform fields (`TRANS`, `ROTAT`, `SCALE`) are applied as usual.
-- Implementation outline:
-  - Use a torus-knot parametric curve; trefoil is the (p=2, q=3) case.
-  - Construct a rotation-minimizing (parallel transport) frame along the curve to sweep a circle with minimal twist.
-  - Emit triangle strips between adjacent rings; compute a world-space AABB for optional bounds culling.
-- References:
-  - Torus Knot — general (p, q) formulation (trefoil is p=2, q=3): https://en.wikipedia.org/wiki/Torus_knot
-  - PBRT v4 — Curves (rotation-minimizing frame): https://pbr-book.org/4ed/Shapes/Curves
-
-Procedural Heightfield Terrain
+Procedural Shapes & Textures
 -----------------------------
 
-- Object type: `heightfield` generated at load time as a triangle mesh.
-- Parameters (JSON):
-  - `GRID_X`, `GRID_Z`: vertex resolution along X/Z (controls mesh density)
-  - `SIZE_X`, `SIZE_Z`: world-space extent of the terrain
-  - `HEIGHT`: vertical amplitude (peak/trough height)
-  - `NOISE_SCALE`: frequency of the driving noise (higher → finer features)
-  - `OCTAVES`: number of fBm layers (higher → more small-scale detail)
-  - Standard `TRANS`, `ROTAT`, `SCALE` are supported
-- Implementation: 2D value-noise fBm drives height y over an XZ grid; two triangles per quad are emitted and a world-space AABB is computed for optional culling.
-- Usage example:
-  - `{ "TYPE":"heightfield", "MATERIAL":"diffuse_white", "GRID_X":64, "GRID_Z":64, "SIZE_X":6.0, "SIZE_Z":6.0, "HEIGHT":0.6, "NOISE_SCALE":1.2, "OCTAVES":5, "TRANS":[0,0.6,-3], "ROTAT":[0,0,0], "SCALE":[1,1,1] }`
-- Notes:
-  - Increase `GRID_X/Z` for smoother silhouettes; this increases triangle count.
-  - Pair `SIZE_X/Z` changes with `NOISE_SCALE` to keep features visually consistent.
-  - Apply any material, including procedural ones (e.g., Marble), since evaluation is in world/object space.
+- Trefoil Knot Tube (Shape)
+  - Torus-knot curve (p=2,q=3) swept with a circular tube.
+  - Rotation-minimizing frame; controls: `SEGMENTS`, `RING_SEGMENTS`.
+  - Size and thickness: `KNOT_SCALE`, `RADIUS`; usual transforms apply.
+  - Emits a triangle mesh with AABB for optional culling.
+
+- Heightfield Terrain (Shape)
+  - XZ grid displaced by 2D value-noise fBm into Y heights.
+  - Controls: `GRID_X/Z`, `SIZE_X/Z`, `HEIGHT`, `NOISE_SCALE`, `OCTAVES`.
+  - Two triangles per quad; world-space evaluation; works with any material.
+  - Pairs well with procedural textures; supports bounds culling.
+
+- Marble (Texture)
+  - fBm + sine warp in world space; `color = lerp(RGB2, RGB1, 0.5+0.5*sin(FREQ*x + WARP*fBm))`.
+  - Controls: `RGB1`, `RGB2`, `SCALE`, `FREQ`, `WARP`, `OCTAVES`, optional `RGB` tint.
+  - UV-less; low–moderate cost per hit; works on any mesh.
+  - Increase `WARP/OCTAVES` for intricate veins; raise `SCALE` for larger features.
+
+- Wood Rings (Texture)
+  - Rings from `r = length((x,z))*SCALE`, with fBm wobble; smoothed `fract(rings)`.
+  - Controls: `LIGHT_RGB`, `DARK_RGB`, `FREQ`, `SCALE`, `NOISE`, `OCTAVES`, optional `RGB`.
+  - `color = lerp(DARK, LIGHT, fract(rings))`; looks great on tubes/terrains.
+  - Adjust `FREQ/SCALE` for ring width; raise `NOISE/OCTAVES` for natural wobble.
+
+Analysis
+- Overview: Shapes are CPU‑generated triangle meshes (knot sweep, heightfield); textures evaluate in world/object space per hit (UV‑less procedural patterns).
+- Performance: Shapes add triangles (intersection cost); heightfield density and knot segment counts dominate. Textures add a few noise calls per hit (octave‑dependent).
+- Acceleration: AABB culling for meshes; material sorting to reduce divergence; limit fBm octaves based on frequency; reuse noise inputs to cut calls.
+- GPU vs CPU: GPU excels at per‑hit texture evaluation and many triangle tests; CPU would suffer on large heightfields/meshes. Mesh build stays on CPU once at load.
+- Future: Add a BVH for triangles, LOD for heightfields, derivative‑aware anti‑aliasing for patterns, and triplanar blending for arbitrary meshes.
 
 Subsurface Scattering (Approx.)
 -------------------------------
@@ -152,6 +140,13 @@ Subsurface Scattering (Approx.)
 - Usage example in scene JSON:
   - `{"TYPE":"Subsurface", "SIGMA_A":[0.1,0.05,0.02], "SIGMA_S":[1.0,0.8,0.6], "RGB":[1.0,0.9,0.8]}`
 
+Analysis
+- Overview: Single‑step diffusion approximation: sample a lateral transport distance by σt, apply Beer–Lambert attenuation and albedo, then scatter diffusely.
+- Performance: Low overhead per hit compared to full random‑walk; increases variance when used broadly; no extra global memory.
+- Acceleration: Use averaged σt for distance sampling; cap step distance; optional RR for deep subsurface paths.
+- GPU vs CPU: GPU handles the extra math per hit well; full random‑walk would benefit even more from GPU parallelism vs a CPU.
+- Future: Separable/dipole BSSRDF, random‑walk SSS, better sampling by diffusion profile, and per‑material max radii.
+
 
 OBJ Mesh Loading
 ----------------
@@ -166,3 +161,10 @@ OBJ Mesh Loading
 - Notes:
   - OBJ normals/UVs are ignored in this minimal loader; shading uses geometric normals from triangles.
   - Large meshes will increase intersection cost; consider enabling material sorting and bounds culling for better coherence.
+
+Analysis
+- Overview: CPU loads OBJ `v/f`, triangulates polygons, transforms vertices, and appends triangles with per‑object ranges and AABBs.
+- Performance: One‑time CPU cost at load; runtime cost grows with triangle count—each path may test many triangles.
+- Acceleration: Optional bounds culling; material sorting for shading coherence. Next step: add a BVH over triangles to reduce tests from O(n) to O(log n).
+- GPU vs CPU: Intersection on GPU is efficient for many rays; CPU would be slower without SIMD. Mesh build stays on CPU where it’s appropriate.
+- Future: Build and upload a BVH, compress vertex data, add per‑mesh transforms to shrink vertex storage, and support indexed vertex buffers.
