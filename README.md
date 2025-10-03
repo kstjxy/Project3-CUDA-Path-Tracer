@@ -88,11 +88,15 @@ Procedural Shapes & Textures
   - Size and thickness: `KNOT_SCALE`, `RADIUS`; usual transforms apply.
   - Emits a triangle mesh with AABB for optional culling.
 
+<img src="https://github.com/user-attachments/assets/aca2a96a-9888-4005-bb0e-980b0979fe95" width="50%">
+
 - Heightfield Terrain (Shape)
   - XZ grid displaced by 2D value-noise fBm into Y heights.
   - Controls: `GRID_X/Z`, `SIZE_X/Z`, `HEIGHT`, `NOISE_SCALE`, `OCTAVES`.
   - Two triangles per quad; world-space evaluation; works with any material.
   - Pairs well with procedural textures; supports bounds culling.
+
+<img src="https://github.com/user-attachments/assets/056b2b60-085f-441a-bbd4-226fc34fd9ae" width="50%">
 
 - Marble (Texture)
   - fBm + sine warp in world space; `color = lerp(RGB2, RGB1, 0.5+0.5*sin(FREQ*x + WARP*fBm))`.
@@ -100,11 +104,15 @@ Procedural Shapes & Textures
   - UV-less; low–moderate cost per hit; works on any mesh.
   - Increase `WARP/OCTAVES` for intricate veins; raise `SCALE` for larger features.
 
+<img src="https://github.com/user-attachments/assets/1e9a9ea2-3e0e-45cd-952b-4d472e829ce1" width="50%">
+
 - Wood Rings (Texture)
   - Rings from `r = length((x,z))*SCALE`, with fBm wobble; smoothed `fract(rings)`.
   - Controls: `LIGHT_RGB`, `DARK_RGB`, `FREQ`, `SCALE`, `NOISE`, `OCTAVES`, optional `RGB`.
   - `color = lerp(DARK, LIGHT, fract(rings))`; looks great on tubes/terrains.
   - Adjust `FREQ/SCALE` for ring width; raise `NOISE/OCTAVES` for natural wobble.
+
+<img src="https://github.com/user-attachments/assets/9cca5f51-c5a1-497b-84ed-f74aeb2ee1a8" width="50%">
 
 Analysis
 - Performance: Shapes add triangles (intersection cost); heightfield density and knot segment counts dominate. Textures add a few noise calls per hit (octave‑dependent).
@@ -144,9 +152,6 @@ OBJ Mesh Loading
 - For each mesh object, records triangle range (`triStart`, `triCount`) and computes a world-space AABB for optional bounds culling.
 - Triangles are stored in `Scene::triangles` and uploaded once to GPU (`dev_triangles`) during `pathtraceInit`.
 - Intersection uses Moller-Trumbore (`triangleIntersectionTest`) and an optional AABB quick-reject when "Mesh bounds culling" is enabled in the ImGui panel.
-- Notes:
-  - OBJ normals/UVs are ignored in this minimal loader; shading uses geometric normals from triangles.
-  - Large meshes will increase intersection cost; consider enabling material sorting and bounds culling for better coherence.
 
 Analysis
 - Performance: One‑time CPU cost at load; runtime cost grows with triangle count—each path may test many triangles.
