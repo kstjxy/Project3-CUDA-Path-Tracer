@@ -1,0 +1,160 @@
+﻿{
+    "Materials":
+    {
+        "light":
+        {
+            "TYPE":"Emitting",
+            "RGB":[1.0, 1.0, 1.0],
+            "EMITTANCE":6.5
+        },
+        "diffuse_white":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.98, 0.98, 0.98]
+        },
+        "diffuse_green":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.35, 0.85, 0.35]
+        },
+        "specular_white": 
+        {
+            "TYPE": "Specular",
+            "RGB": [ 0.98, 0.98, 0.98 ],
+            "ROUGHNESS": 0.0
+        },
+        "diffuse_pink": {
+            "TYPE": "Diffuse",
+            "RGB": [ 0.98, 0.78, 0.98 ]
+        },
+        "diffuse_grey":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.5, 0.5, 0.5],
+            "ROUGHNESS":0.0
+        },
+        "specular_glossy":
+        {
+            "TYPE":"Specular",
+            "RGB":[0.98, 0.98, 0.98],
+            "ROUGHNESS":0.3
+        },
+        "glass":
+        {
+            "TYPE":"Glass",
+            "RGB":[1.0, 1.0, 1.0],
+            "IOR":1.5
+        },
+        "Wax":
+        {
+            "TYPE":"Subsurface",
+            "SIGMA_A":[0.010, 0.005, 0.002],
+            "SIGMA_S":[0.350, 0.300, 0.250],
+            "RGB":[1.0, 0.95, 0.85]
+        },
+        "marble_white": {
+          "TYPE": "Marble",
+          "RGB1": [ 0.35, 0.35, 0.35 ],
+          "RGB2": [ 0.8, 0.8, 0.8 ],
+          "SCALE": 1.2,
+          "FREQ": 6.0,
+          "WARP": 2.0,
+          "OCTAVES": 5,
+          "RGB": [ 1.0, 1.0, 1.0 ]
+        },
+      "marble_blue": {
+        "TYPE": "Marble",
+        "RGB1": [ 0.15, 0.275, 0.88 ],
+        "RGB2": [ 0.6, 0.85, 0.98 ],
+        "SCALE": 1.2,
+        "FREQ": 6.0,
+        "WARP": 2.0,
+        "OCTAVES": 5,
+        "RGB": [ 1.0, 1.0, 1.0 ]
+      },
+      "wood_oak":  {
+                  "TYPE":  "Wood",
+                  "LIGHT_RGB":  [0.85,0.7,0.5],
+                  "DARK_RGB":  [0.4,0.2,0.1],
+                  "SCALE":  1.2,
+                  "FREQ":  10,
+                  "NOISE":  0.4,
+                  "OCTAVES":  4,
+                  "RGB":  [1,1,1]
+              }
+    },
+    "Camera":
+    {
+        "RES":[1200,700],
+        "FOVY":45.0,
+        "ITERATIONS":5000,
+        "DEPTH":8,
+        "FILE":"cornell",
+        "EYE":[0.0,-12,9],
+        "LOOKAT":[0.0,1.5,0.0],
+        "UP":[0.0,1.0,0.0]
+    },
+  "Objects": [
+    {
+      "TYPE": "cube",
+      "MATERIAL": "light",
+      "TRANS": [ 0.0, 15.0, 0.0 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 7.0, 0.3, 7.0 ]
+    },
+    {
+      "TYPE": "cube",
+      "MATERIAL": "diffuse_white",
+      "TRANS": [ 0.0, 0.0, -5 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 50.0, 0.01, 30.0 ]
+    },
+    {
+      "TYPE": "mesh",
+      "MATERIAL": "diffuse_pink",
+      "FILE": "../models/cats/cat_06.obj",
+      "TRANS": [ 0, 2, -3.25 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 1.0, 1.0, 1.0 ]
+    },
+    {
+      "TYPE": "mesh",
+      "MATERIAL": "diffuse_pink",
+      "FILE": "../models/cats/cat_08.obj",
+      "TRANS": [ -5.75, 2, -3 ],
+      "ROTAT": [ 0.0, 100, 0.0 ],
+      "SCALE": [ 1.0, 1.0, 1.0 ]
+    },
+    {
+      "TYPE": "mesh",
+      "MATERIAL": "diffuse_pink",
+      "FILE": "../models/cats/cat_02.obj",
+      "TRANS": [ 6, 2, -2.5 ],
+      "ROTAT": [ 0.0, -45, 0.0 ],
+      "SCALE": [ 1.0, 1.0, 1.0 ]
+    },
+    {
+      "TYPE": "mesh",
+      "MATERIAL": "diffuse_pink",
+      "FILE": "../models/cats/cat_03.obj",
+      "TRANS": [ -5.25, 1, 3 ],
+      "ROTAT": [ 0.0, 80, 0.0 ],
+      "SCALE": [ 1.0, 1.0, 1.0 ]
+    },
+    {
+      "TYPE": "mesh",
+      "MATERIAL": "diffuse_pink",
+      "FILE": "../models/cats/cat_04.obj",
+      "TRANS": [ 6, 2, 3 ],
+      "ROTAT": [ 0.0, -80, 0.0 ],
+      "SCALE": [ 1.0, 1.0, 1.0 ]
+    },
+    {
+      "TYPE": "sphere",
+      "MATERIAL": "diffuse_pink",
+      "TRANS": [ 0.2, 1.5, 1.75 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 1.5, 1.5, 1.5 ]
+    }
+  ]
+}
