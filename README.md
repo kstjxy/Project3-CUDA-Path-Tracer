@@ -8,6 +8,9 @@
 
 * Tested on: Windows 11, i7-14700K @ 3.40GHz, 64GB RAM, NVIDIA GeForce RTX 4080 SUPER
 
+  <img width="1200" height="700" alt="cornell 2025-10-05_15-11-32z 5000samp" src="https://github.com/user-attachments/assets/1eaac584-3a33-4d36-af60-7bb7680b7ae1" />
+
+
 Core Features
 -------------
 
@@ -41,6 +44,30 @@ Analysis
 - GPU vs CPU: Both benefit, but GPUs especially due to fewer long‑tail warps; divergence in path lengths is mitigated by per‑bounce compaction and material sorting.
 - Future: Adaptive start depth per material/throughput; albedo‑based survival probability; combine with next‑event estimation to reduce variance further.
 
+  ![1c2ded9a77e05b73263c7d04db080a3e](https://github.com/user-attachments/assets/4d7abe5f-f2c7-4621-acbc-689ee8296d0f)
+
+
+Specular Reflection and Refraction (Glass)
+------------------------------------------
+
+- Specular reflection with optional glossiness (fuzzy metal):
+  - `Specular` material with `ROUGHNESS` in scene JSON controls fuzz.
+  - Uses `glm::reflect` and adds a random vector in unit sphere scaled by roughness, per Ray Tracing in One Weekend.
+- Refraction (glass/water) with Fresnel (Schlick):
+  - New `Glass` material type with `IOR` and optional `RGB`.
+  - Uses `glm::refract` for Snell's law and Schlick approximation for reflect vs refract splitting.
+  - Handles total internal reflection.
+- Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
+
+Analysis
+- Performance: Slightly higher shading cost and potentially more bounces from internal reflections; can increase divergence—material sorting helps.
+- Acceleration: Early exit on light hits; keep epsilon offsets consistent; optional RR on internal bounces reduces tail cost.
+- GPU vs CPU: GPU benefits when many pixels hit the same material due to SIMT; divergence across mixed dielectrics is mitigated by sorting.
+- Future: Microfacet rough dielectrics (GGX), spectral dispersion (wavelength‑dependent IOR), multiple importance sampling with environment lights.
+
+![784d383ba6909bebcf19389cc3c82d7c](https://github.com/user-attachments/assets/ed6bef3d-b0b0-42a9-ac84-1d66670a7a50)
+
+
 Physically-Based Depth of Field
 -------------------------------------------
 
@@ -61,23 +88,9 @@ Analysis
 - GPU vs CPU: Equally suited—the work happens once per primary ray; no heavy divergence; excellent GPU fit.
 - Future: Polygonal/annular apertures, anamorphic lenses, autofocus (pick focal plane by depth), and importance sampling the lens by pixel circle of confusion.
 
-Specular Reflection and Refraction (Glass)
-------------------------------------------
-
-- Specular reflection with optional glossiness (fuzzy metal):
-  - `Specular` material with `ROUGHNESS` in scene JSON controls fuzz.
-  - Uses `glm::reflect` and adds a random vector in unit sphere scaled by roughness, per Ray Tracing in One Weekend.
-- Refraction (glass/water) with Fresnel (Schlick):
-  - New `Glass` material type with `IOR` and optional `RGB`.
-  - Uses `glm::refract` for Snell's law and Schlick approximation for reflect vs refract splitting.
-  - Handles total internal reflection.
-- Probability-free weighting: choose reflect/refract based on Fresnel probability; throughput scaled by material color to tint contributions.
-
-Analysis
-- Performance: Slightly higher shading cost and potentially more bounces from internal reflections; can increase divergence—material sorting helps.
-- Acceleration: Early exit on light hits; keep epsilon offsets consistent; optional RR on internal bounces reduces tail cost.
-- GPU vs CPU: GPU benefits when many pixels hit the same material due to SIMT; divergence across mixed dielectrics is mitigated by sorting.
-- Future: Microfacet rough dielectrics (GGX), spectral dispersion (wavelength‑dependent IOR), multiple importance sampling with environment lights.
+| DOF off | DOF with Lens Radius = 0.125 | DOF with Lens Radius = 0.25 |
+|:--:|:--:|:--:|
+| ![bf2d6a196cc86aef6855378cce1866ad](https://github.com/user-attachments/assets/7c7062fc-316e-45b1-b2bd-a5a33d7505c2) | ![edadcf3616b20f53a013664f3df72bda](https://github.com/user-attachments/assets/2a27f161-b7ca-4903-9025-1aa4c2e1223f) | ![edadcf3616b20f53a013664f3df72bda](https://github.com/user-attachments/assets/4841a03e-b5fa-4a39-9109-94000afc4c91) |
 
 Procedural Shapes & Textures
 -----------------------------
@@ -88,7 +101,8 @@ Procedural Shapes & Textures
   - Size and thickness: `KNOT_SCALE`, `RADIUS`; usual transforms apply.
   - Emits a triangle mesh with AABB for optional culling.
 
-<img src="https://github.com/user-attachments/assets/aca2a96a-9888-4005-bb0e-980b0979fe95" width="100%">
+![4c8a45942757a72b497062acab41c14d](https://github.com/user-attachments/assets/e153fc91-f2bc-4e8c-8674-1f4d8cdd9e31)
+
 
 - Heightfield Terrain (Shape)
   - XZ grid displaced by 2D value-noise fBm into Y heights.
@@ -96,7 +110,8 @@ Procedural Shapes & Textures
   - Two triangles per quad; world-space evaluation; works with any material.
   - Pairs well with procedural textures; supports bounds culling.
 
-<img src="https://github.com/user-attachments/assets/056b2b60-085f-441a-bbd4-226fc34fd9ae" width="100%">
+![71aee764ac00eec1e89c7cc91a9b504e](https://github.com/user-attachments/assets/d5fbc761-e2d1-4b54-9d41-43e947463a67)
+
 
 - Marble (Texture)
   - fBm + sine warp in world space; `color = lerp(RGB2, RGB1, 0.5+0.5*sin(FREQ*x + WARP*fBm))`.
@@ -104,7 +119,8 @@ Procedural Shapes & Textures
   - UV-less; low–moderate cost per hit; works on any mesh.
   - Increase `WARP/OCTAVES` for intricate veins; raise `SCALE` for larger features.
 
-<img src="https://github.com/user-attachments/assets/1e9a9ea2-3e0e-45cd-952b-4d472e829ce1" width="100%">
+![f653476c5ffd15898fbc2ce6d109b5f1](https://github.com/user-attachments/assets/2163bece-3da6-4f8c-89a1-407821db649d)
+
 
 - Wood Rings (Texture)
   - Rings from `r = length((x,z))*SCALE`, with fBm wobble; smoothed `fract(rings)`.
@@ -112,7 +128,8 @@ Procedural Shapes & Textures
   - `color = lerp(DARK, LIGHT, fract(rings))`; looks great on tubes/terrains.
   - Adjust `FREQ/SCALE` for ring width; raise `NOISE/OCTAVES` for natural wobble.
 
-<img src="https://github.com/user-attachments/assets/9cca5f51-c5a1-497b-84ed-f74aeb2ee1a8" width="100%">
+![39213e1797b3fcaf5a6af9ea3acc7947](https://github.com/user-attachments/assets/5bf32aa7-9e1b-4791-8221-41a9d50dfc6f)
+
 
 Analysis
 - Performance: Shapes add triangles (intersection cost); heightfield density and knot segment counts dominate. Textures add a few noise calls per hit (octave‑dependent).
@@ -141,6 +158,7 @@ Analysis
 - GPU vs CPU: GPU handles the extra math per hit well; full random‑walk would benefit even more from GPU parallelism vs a CPU.
 - Future: Separable/dipole BSSRDF, random‑walk SSS, better sampling by diffusion profile, and per‑material max radii.
 
+![b38c9f5bb266dc44f7525fc86a31da2b](https://github.com/user-attachments/assets/ad1001cc-4f70-42d9-b2d3-a0bd3eea0bb6)
 
 OBJ Mesh Loading
 ----------------
@@ -158,3 +176,5 @@ Analysis
 - Acceleration: Optional bounds culling; material sorting for shading coherence. Next step: add a BVH over triangles to reduce tests from O(n) to O(log n).
 - GPU vs CPU: Intersection on GPU is efficient for many rays; CPU would be slower without SIMD. Mesh build stays on CPU where it’s appropriate.
 - Future: Build and upload a BVH, compress vertex data, add per‑mesh transforms to shrink vertex storage, and support indexed vertex buffers.
+
+![d2a6a10616b7e7038db4016526438f7f](https://github.com/user-attachments/assets/ec88bf58-686e-4bf5-abf5-aa5aadd670af)
